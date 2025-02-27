@@ -29,9 +29,22 @@
 		3F205C442D6D462C0077604C /* rereremindUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = rereremindUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
+/* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
+		3F205CA32D6D48230077604C /* Exceptions for "rereremind" folder in "rereremind" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				Untitled.swift,
+			);
+			target = 3F205C282D6D462A0077604C /* rereremind */;
+		};
+/* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
+
 /* Begin PBXFileSystemSynchronizedRootGroup section */
 		3F205C2B2D6D462A0077604C /* rereremind */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+				3F205CA32D6D48230077604C /* Exceptions for "rereremind" folder in "rereremind" target */,
+			);
 			path = rereremind;
 			sourceTree = "<group>";
 		};
