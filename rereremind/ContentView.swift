@@ -13,9 +13,13 @@ struct ContentView: View {
     @State private var lastUserInput: String = ""
     @State private var reminders: [Reminder] = []
     @State private var showReminderList = false
-    
+    @State private var showSnoozeView = false
+    @State private var snoozeReminder: Reminder?
+
+    @ObservedObject var notificationHandler = NotificationHandler.shared // 🔹 `NotificationHandler` を監視
+
     let remindersKey = "savedReminders"
-    
+
     var body: some View {
         NavigationStack {
             VStack {
@@ -42,7 +46,7 @@ struct ContentView: View {
                     }
                 }
                 .padding()
-                
+
                 HStack {
                     TextField("メッセージを入力", text: $inputText)
                         .textFieldStyle(RoundedBorderTextFieldStyle())
@@ -51,24 +55,55 @@ struct ContentView: View {
                     }
                 }
                 .padding()
-                
+
                 Button("リマインダー一覧を表示") {
                     showReminderList = true
                 }
                 .padding()
-                .sheet(isPresented: $showReminderList) {
-                    ReminderListView(reminders: $reminders)
-                }
             }
             .navigationTitle("リマインダーBot")
             .onAppear {
                 loadReminders()
                 filterValidReminders()
+                NotificationHandler.shared.requestAuthorization() // 🔹 通知許可をリクエスト
+            }
+            // 🔹 `showSnoozeView` の変更を監視
+            .onChange(of: notificationHandler.showSnoozeView) { _, _ in
+                            if notificationHandler.showSnoozeView, let reminder = notificationHandler.snoozeReminder {
+                                print("🟢 SnoozeView を表示します")
+                                self.snoozeReminder = reminder
+                                self.showSnoozeView = true
+                                notificationHandler.showSnoozeView = false // 🔹 一度開いたらリセット
+                            }
+            }
+            .sheet(isPresented: $showReminderList) {
+                ReminderListView(reminders: $reminders, updateReminder: updateReminder) // 🔹 `updateReminder` を渡す
+            }
+            .sheet(isPresented: $showSnoozeView) {
+                if let reminder = snoozeReminder {
+                    SnoozeView(reminder: reminder, updateReminder: updateReminder) // 🔹 `updateReminder` を渡す
+                }
             }
         }
     }
 
-    
+    // 🔹 リマインダーを更新するメソッドを追加
+    func updateReminder(oldReminder: Reminder, newDate: Date) {
+        if let index = reminders.firstIndex(where: { $0.id == oldReminder.id }) {
+            reminders[index] = Reminder(text: oldReminder.text, date: newDate)
+            saveReminders() // 🔹 保存
+        }
+    }
+
+    func saveReminders() {
+        let encoder = JSONEncoder()
+        if let encoded = try? encoder.encode(reminders) {
+            UserDefaults.standard.set(encoded, forKey: remindersKey)
+        }
+    }
+
+
+
     func sendMessage() {
             let userMessage = Message(text: inputText, isUser: true)
             messages.append(userMessage)
@@ -208,13 +243,6 @@ struct ContentView: View {
         return extractedDate
     }
     
-    func saveReminders() {
-            let encoder = JSONEncoder()
-            if let encoded = try? encoder.encode(reminders) {
-                UserDefaults.standard.set(encoded, forKey: remindersKey)
-            }
-        }
-    
     func loadReminders() {
             if let savedData = UserDefaults.standard.data(forKey: remindersKey) {
                 let decoder = JSONDecoder()
@@ -237,20 +265,22 @@ struct ContentView: View {
 
     
     func scheduleNotification(at date: Date, message: String) {
-            let content = UNMutableNotificationContent()
-            content.title = "リマインダー"
-            content.body = message
-            content.sound = .default
-            
-            let trigger = UNCalendarNotificationTrigger(dateMatching: Calendar.current.dateComponents([.year, .month, .day, .hour, .minute], from: date), repeats: false)
-            let request = UNNotificationRequest(identifier: UUID().uuidString, content: content, trigger: trigger)
-            
-            UNUserNotificationCenter.current().add(request) { error in
-                if let error = error {
-                    print("通知のスケジュールに失敗: \(error.localizedDescription)")
-                }
+        let content = UNMutableNotificationContent()
+        content.title = "リマインダー"
+        content.body = message
+        content.sound = .default
+        content.categoryIdentifier = "REMINDER_CATEGORY" // 🔹 通知カテゴリーを設定
+
+        let trigger = UNCalendarNotificationTrigger(dateMatching: Calendar.current.dateComponents([.year, .month, .day, .hour, .minute], from: date), repeats: false)
+        let request = UNNotificationRequest(identifier: UUID().uuidString, content: content, trigger: trigger)
+
+        UNUserNotificationCenter.current().add(request) { error in
+            if let error = error {
+                print("通知のスケジュールに失敗: \(error.localizedDescription)")
             }
         }
+    }
+
 }
 
 #Preview {

@@ -9,40 +9,53 @@ import UserNotifications
 
 struct ReminderListView: View {
     @Binding var reminders: [Reminder]
-    
+    var updateReminder: (Reminder, Date) -> Void // 🔹 `updateReminder` を受け取る
+
+    @State private var selectedReminder: Reminder?
+
     var body: some View {
         NavigationStack {
             List {
                 ForEach(reminders) { reminder in
-                    VStack(alignment: .leading) {
-                        Text(reminder.text)
-                            .font(.headline)
-                        Text(formatDate(reminder.date))
-                            .font(.subheadline)
-                            .foregroundColor(.gray)
+                    HStack {
+                        VStack(alignment: .leading) {
+                            Text(reminder.text)
+                                .font(.headline)
+                            Text(formatDate(reminder.date)) // 🔹 延長後の時間が表示されるように修正
+                                .font(.subheadline)
+                                .foregroundColor(.gray)
+                        }
+                        Spacer()
+                        Button("延長") {
+                            selectedReminder = reminder
+                        }
+                        .buttonStyle(.borderedProminent)
                     }
                 }
-                .onDelete(perform: deleteReminder) // スワイプで削除
+                .onDelete(perform: deleteReminder)
             }
             .navigationTitle("リマインダー一覧")
+            .sheet(item: $selectedReminder) { reminder in
+                SnoozeView(reminder: reminder, updateReminder: updateReminder) // 🔹 `updateReminder` を渡す
+            }
         }
     }
-    
+
     func formatDate(_ date: Date) -> String {
         let formatter = DateFormatter()
         formatter.dateFormat = "yyyy/MM/dd HH:mm"
         return formatter.string(from: date)
     }
-    
+
     func deleteReminder(at offsets: IndexSet) {
         for index in offsets {
             let reminder = reminders[index]
-            cancelNotification(for: reminder) // 通知も削除
+            cancelNotification(for: reminder)
         }
         reminders.remove(atOffsets: offsets)
-        saveReminders() // 永続化
+        saveReminders()
     }
-    
+
     func cancelNotification(for reminder: Reminder) {
         UNUserNotificationCenter.current().getPendingNotificationRequests { requests in
             for request in requests {
@@ -53,7 +66,7 @@ struct ReminderListView: View {
             }
         }
     }
-    
+
     func saveReminders() {
         let encoder = JSONEncoder()
         if let encoded = try? encoder.encode(reminders) {
