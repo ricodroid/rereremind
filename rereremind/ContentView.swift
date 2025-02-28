@@ -64,7 +64,12 @@ struct ContentView: View {
             .navigationTitle("リマインダーBot")
             .onAppear {
                 loadReminders()
-                filterValidReminders()
+                
+                // 0.5秒後に実行して、リマインダーの削除を遅延
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                    filterValidReminders()
+                }
+
                 NotificationHandler.shared.requestAuthorization() // 🔹 通知許可をリクエスト
             }
             // 🔹 `showSnoozeView` の変更を監視
@@ -87,13 +92,27 @@ struct ContentView: View {
         }
     }
 
-    // 🔹 リマインダーを更新するメソッドを追加
     func updateReminder(oldReminder: Reminder, newDate: Date) {
         if let index = reminders.firstIndex(where: { $0.id == oldReminder.id }) {
-            reminders[index] = Reminder(text: oldReminder.text, date: newDate)
-            saveReminders() // 🔹 保存
+            let updatedReminder = Reminder(id: oldReminder.id, text: oldReminder.text, date: newDate)
+            
+            // 🔹 まず古い通知を削除
+            cancelNotification(for: oldReminder)
+
+            // 🔹 リマインダーリストを更新
+            reminders[index] = updatedReminder
+            saveReminders()
+
+            // 🔹 新しい通知をスケジュール
+            scheduleNotification(at: newDate, message: oldReminder.text)
+
+            // 🔹 1秒後に filterValidReminders() を実行
+            DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
+                self.filterValidReminders()
+            }
         }
     }
+
 
     func saveReminders() {
         let encoder = JSONEncoder()
@@ -102,6 +121,19 @@ struct ContentView: View {
         }
     }
 
+    func cancelNotification(for reminder: Reminder) {
+        UNUserNotificationCenter.current().getPendingNotificationRequests { requests in
+            let matchingRequests = requests.filter { $0.content.body == reminder.text }
+            
+            // 🔹 IDが一致する通知を削除
+            let identifiersToRemove = matchingRequests.map { $0.identifier }
+            UNUserNotificationCenter.current().removePendingNotificationRequests(withIdentifiers: identifiersToRemove)
+            
+            if !identifiersToRemove.isEmpty {
+                print("📌 通知削除: \(identifiersToRemove)")
+            }
+        }
+    }
 
 
     func sendMessage() {
@@ -253,15 +285,20 @@ struct ContentView: View {
         }
     
     func filterValidReminders() {
-          UNUserNotificationCenter.current().getPendingNotificationRequests { requests in
-              DispatchQueue.main.async {
-                  self.reminders = self.reminders.filter { reminder in
-                      requests.contains { $0.content.body == reminder.text }
-                  }
-                  self.saveReminders() // 更新後に再保存
-              }
-          }
-      }
+        UNUserNotificationCenter.current().getPendingNotificationRequests { requests in
+            DispatchQueue.main.async {
+                let requestBodies = requests.map { $0.content.body }
+                
+                // 🔹 "削除" ではなく、有効な通知をリストに残す
+                self.reminders = self.reminders.filter { reminder in
+                    requestBodies.contains(reminder.text)
+                }
+
+                self.saveReminders() // 更新後に再保存
+            }
+        }
+    }
+
 
     
     func scheduleNotification(at date: Date, message: String) {
