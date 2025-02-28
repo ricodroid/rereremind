@@ -11,43 +11,63 @@ struct ContentView: View {
     @State private var messages: [Message] = []
     @State private var inputText: String = ""
     @State private var lastUserInput: String = ""
+    @State private var reminders: [Reminder] = []
+    @State private var showReminderList = false
+    
+    let remindersKey = "savedReminders"
     
     var body: some View {
-        VStack {
-            ScrollView {
-                VStack(alignment: .leading, spacing: 10) {
-                    ForEach(messages) { message in
-                        HStack {
-                            if message.isUser {
-                                Spacer()
-                                Text(message.text)
-                                    .padding()
-                                    .background(Color.blue.opacity(0.7))
-                                    .cornerRadius(10)
-                                    .foregroundColor(.white)
-                            } else {
-                                Text(message.text)
-                                    .padding()
-                                    .background(Color.gray.opacity(0.3))
-                                    .cornerRadius(10)
-                                Spacer()
+        NavigationStack {
+            VStack {
+                ScrollView {
+                    VStack(alignment: .leading, spacing: 10) {
+                        ForEach(messages) { message in
+                            HStack {
+                                if message.isUser {
+                                    Spacer()
+                                    Text(message.text)
+                                        .padding()
+                                        .background(Color.blue.opacity(0.7))
+                                        .cornerRadius(10)
+                                        .foregroundColor(.white)
+                                } else {
+                                    Text(message.text)
+                                        .padding()
+                                        .background(Color.gray.opacity(0.3))
+                                        .cornerRadius(10)
+                                    Spacer()
+                                }
                             }
                         }
                     }
                 }
-            }
-            .padding()
-            
-            HStack {
-                TextField("メッセージを入力", text: $inputText)
-                    .textFieldStyle(RoundedBorderTextFieldStyle())
-                Button("送信") {
-                    sendMessage()
+                .padding()
+                
+                HStack {
+                    TextField("メッセージを入力", text: $inputText)
+                        .textFieldStyle(RoundedBorderTextFieldStyle())
+                    Button("送信") {
+                        sendMessage()
+                    }
+                }
+                .padding()
+                
+                Button("リマインダー一覧を表示") {
+                    showReminderList = true
+                }
+                .padding()
+                .sheet(isPresented: $showReminderList) {
+                    ReminderListView(reminders: $reminders)
                 }
             }
-            .padding()
+            .navigationTitle("リマインダーBot")
+            .onAppear {
+                loadReminders()
+                filterValidReminders()
+            }
         }
     }
+
     
     func sendMessage() {
             let userMessage = Message(text: inputText, isUser: true)
@@ -63,6 +83,10 @@ struct ContentView: View {
                     let botPastDateMessage = Message(text: "未来の日付で答えてください！いつ教えて欲しいですか？", isUser: false)
                     messages.append(botPastDateMessage)
                 } else {
+                    let reminder = Reminder(text: lastUserInput, date: date)
+                    reminders.append(reminder) // リストに追加
+                    saveReminders() // 永続化
+                    
                     let botConfirmationMessage = Message(text: "\(formatDate(date)) にリマインドしますね！", isUser: false)
                     messages.append(botConfirmationMessage)
                     scheduleNotification(at: date, message: lastUserInput)
@@ -183,6 +207,33 @@ struct ContentView: View {
 
         return extractedDate
     }
+    
+    func saveReminders() {
+            let encoder = JSONEncoder()
+            if let encoded = try? encoder.encode(reminders) {
+                UserDefaults.standard.set(encoded, forKey: remindersKey)
+            }
+        }
+    
+    func loadReminders() {
+            if let savedData = UserDefaults.standard.data(forKey: remindersKey) {
+                let decoder = JSONDecoder()
+                if let loadedReminders = try? decoder.decode([Reminder].self, from: savedData) {
+                    reminders = loadedReminders
+                }
+            }
+        }
+    
+    func filterValidReminders() {
+          UNUserNotificationCenter.current().getPendingNotificationRequests { requests in
+              DispatchQueue.main.async {
+                  self.reminders = self.reminders.filter { reminder in
+                      requests.contains { $0.content.body == reminder.text }
+                  }
+                  self.saveReminders() // 更新後に再保存
+              }
+          }
+      }
 
     
     func scheduleNotification(at date: Date, message: String) {
