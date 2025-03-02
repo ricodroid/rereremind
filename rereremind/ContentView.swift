@@ -180,78 +180,62 @@ struct ContentView: View {
         let calendar = Calendar.current
         var components = calendar.dateComponents([.year, .month, .day, .hour, .minute], from: now)
 
-        // 日付の正規表現
+        // Date patterns (Japanese & English)
         let datePatterns = [
-            "\\d{4}/\\d{1,2}/\\d{1,2}",  // 2025/5/1, 2026/1/1, 2027/02/01
-            "\\d{1,2}/\\d{1,2}",         // 5/1
-            "\\d{1,2}月\\d{1,2}日",     // 5月1日
-            "\\d{4}年\\d{1,2}月\\d{1,2}日", // 2025年5月1日
-            "今日|きょう", "明日|あした", "明後日|あさって", "明々後日"
+            "\\d{4}/\\d{1,2}/\\d{1,2}",         // 2025/5/1, 2026/1/1
+            "\\d{1,2}/\\d{1,2}",                // 5/1
+            "\\d{1,2}月\\d{1,2}日",            // 5月1日
+            "\\d{4}年\\d{1,2}月\\d{1,2}日",    // 2025年5月1日
+            "今日|きょう|today",
+            "明日|あした|tomorrow",
+            "明後日|あさって|day after tomorrow",
+            "明々後日|three days later"
         ]
 
         for pattern in datePatterns {
             if let match = text.range(of: pattern, options: .regularExpression) {
                 let matchedDate = String(text[match])
-                if matchedDate.contains("今日") || matchedDate.contains("きょう") {
-                    // 今日の日付
-                } else if matchedDate.contains("明日") || matchedDate.contains("あした") {
+                if ["今日", "きょう", "today"].contains(matchedDate) {
+                    // Today (no changes needed)
+                } else if ["明日", "あした", "tomorrow"].contains(matchedDate) {
                     components.day! += 1
-                } else if matchedDate.contains("明後日") || matchedDate.contains("あさって") {
+                } else if ["明後日", "あさって", "day after tomorrow"].contains(matchedDate) {
                     components.day! += 2
-                } else if matchedDate.contains("明々後日") {
+                } else if ["明々後日", "three days later"].contains(matchedDate) {
                     components.day! += 3
                 } else {
-                    formatter.dateFormat = "yyyy/M/d"
-                    if let parsedDate = formatter.date(from: matchedDate) {
-                        components.year = calendar.component(.year, from: parsedDate)
-                        components.month = calendar.component(.month, from: parsedDate)
-                        components.day = calendar.component(.day, from: parsedDate)
-                        break
-                    }
-
-                    formatter.dateFormat = "yyyy年M月d日"
-                    if let parsedDate = formatter.date(from: matchedDate) {
-                        components.year = calendar.component(.year, from: parsedDate)
-                        components.month = calendar.component(.month, from: parsedDate)
-                        components.day = calendar.component(.day, from: parsedDate)
-                        break
-                    }
-
-                    // ここを追加
-                    formatter.dateFormat = "M/d"
-                    if let parsedDate = formatter.date(from: matchedDate) {
-                        components.year = calendar.component(.year, from: now) // 現在の年を適用
-                        components.month = calendar.component(.month, from: parsedDate)
-                        components.day = calendar.component(.day, from: parsedDate)
-                        break
-                    }
-
-                    formatter.dateFormat = "MM/dd"
-                    if let parsedDate = formatter.date(from: matchedDate) {
-                        components.year = calendar.component(.year, from: now) // 現在の年を適用
-                        components.month = calendar.component(.month, from: parsedDate)
-                        components.day = calendar.component(.day, from: parsedDate)
-                        break
+                    let dateFormats = ["yyyy/M/d", "yyyy年M月d日", "M/d", "MM/dd", "MMMM d", "MMMM d, yyyy"]
+                    for format in dateFormats {
+                        formatter.dateFormat = format
+                        if let parsedDate = formatter.date(from: matchedDate) {
+                            components.year = calendar.component(.year, from: parsedDate)
+                            components.month = calendar.component(.month, from: parsedDate)
+                            components.day = calendar.component(.day, from: parsedDate)
+                            break
+                        }
                     }
                 }
-
+                break
             }
         }
 
-        // 時間の正規表現
+        // Time patterns (Japanese & English)
         let timePatterns = [
-            "\\d{1,2}:\\d{2}",      // 9:00, 21:30
-            "\\d{1,2}時",            // 9時, 21時
-            "\\d{1,2}：\\d{2}",    // ９：００
-            "\\d{1,2}:\\d{2} (am|pm)" // 9:00 am
+            "\\d{1,2}:\\d{2}",          // 9:00, 21:30
+            "\\d{1,2}時",               // 9時, 21時
+            "\\d{1,2}：\\d{2}",         // ９：００
+            "\\d{1,2}:\\d{2} (am|pm)"   // 9:00 am, 10:30 pm
         ]
 
         var foundTime = false
         for pattern in timePatterns {
             if let match = text.range(of: pattern, options: .regularExpression) {
-                let matchedTime = String(text[match]).replacingOccurrences(of: "：", with: ":")
-                formatter.dateFormat = "H:mm"
-                if let parsedTime = formatter.date(from: matchedTime.replacingOccurrences(of: "時", with: ":00")) {
+                var matchedTime = String(text[match]).replacingOccurrences(of: "：", with: ":")
+                if matchedTime.contains("時") {
+                    matchedTime = matchedTime.replacingOccurrences(of: "時", with: ":00")
+                }
+                formatter.dateFormat = "h:mm a" // Handles both "9:00" and "9:00 am/pm"
+                if let parsedTime = formatter.date(from: matchedTime) {
                     components.hour = calendar.component(.hour, from: parsedTime)
                     components.minute = calendar.component(.minute, from: parsedTime)
                     foundTime = true
@@ -267,7 +251,7 @@ struct ContentView: View {
 
         let extractedDate = calendar.date(from: components)
 
-        // 修正: 現在より前の日付を避ける
+        // Avoid past dates
         if let date = extractedDate, date < now {
             return nil
         }
