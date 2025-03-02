@@ -1,0 +1,12 @@
+//
+//  Localizable.strings
+//  rereremind
+//
+//  Created by riko on 2025/03/01.
+//
+
+"reminder_prompt" = "\"%@\" ですね！ いつ教えて欲しいですか？";
+"past_date_error" = "未来の日付で答えてください！いつ教えて欲しいですか？";
+"reminder_set" = "%@ にリマインドしますね！";
+"unknown_date_error" = "すみません、わかりませんでした。正しい日付で教えてください。";
+

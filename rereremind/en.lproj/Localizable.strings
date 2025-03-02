@@ -1,0 +1,11 @@
+//
+//  Localizable.strings
+//  rereremind
+//
+//  Created by riko on 2025/03/01.
+//
+
+"reminder_prompt" = "\"%@\" Got it! When should I remind you?";
+"past_date_error" = "Please provide a future date! When should I remind you?";
+"reminder_set" = "I will remind you on %@!";
+"unknown_date_error" = "Sorry, I didn't understand. Please provide a correct date.";
