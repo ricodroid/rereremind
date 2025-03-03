@@ -9,3 +9,15 @@
 "past_date_error" = "Please provide a future date! When should I remind you?";
 "reminder_set" = "I will remind you on %@!";
 "unknown_date_error" = "Sorry, I didn't understand. Please provide a correct date.";
+"snooze_10_minutes" = "Remind me in 10 minutes";
+"snooze_1_hour" = "Remind me in 1 hour";
+"snooze_2_hours" = "Remind me in 2 hours";
+"snooze_3_hours" = "Remind me in 3 hours";
+"snooze_tomorrow_same_time" = "Remind me at the same time tomorrow";
+"snooze_2_days_later" = "Remind me at the same time in 2 days";
+"snooze_3_days_later" = "Remind me at the same time in 3 days";
+"snooze_1_week_later" = "Remind me at the same time in 1 week";
+"snooze_title" = "Snooze Notification";
+"close" = "Close";
+"reminder_title" = "Reminder";
+"schedule_error" = "Failed to schedule snooze notification:";

@@ -9,4 +9,15 @@
 "past_date_error" = "未来の日付で答えてください！いつ教えて欲しいですか？";
 "reminder_set" = "%@ にリマインドしますね！";
 "unknown_date_error" = "すみません、わかりませんでした。正しい日付で教えてください。";
-
+"snooze_10_minutes" = "10分後に再通知";
+"snooze_1_hour" = "1時間後に再通知";
+"snooze_2_hours" = "2時間後に再通知";
+"snooze_3_hours" = "3時間後に再通知";
+"snooze_tomorrow_same_time" = "明日の同じ時間に再通知";
+"snooze_2_days_later" = "2日後の同じ時間に再通知";
+"snooze_3_days_later" = "3日後の同じ時間に再通知";
+"snooze_1_week_later" = "1週間後の同じ時間に再通知";
+"snooze_title" = "通知を延長";
+"close" = "閉じる";
+"reminder_title" = "リマインダー";
+"schedule_error" = "再通知のスケジュールに失敗:";

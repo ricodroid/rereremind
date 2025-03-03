@@ -21,76 +21,96 @@ struct ContentView: View {
     let remindersKey = "savedReminders"
 
     var body: some View {
-        NavigationStack {
-            VStack {
-                ScrollView {
-                    VStack(alignment: .leading, spacing: 10) {
-                        ForEach(messages) { message in
-                            HStack {
-                                if message.isUser {
-                                    Spacer()
-                                    Text(message.text)
-                                        .padding()
-                                        .background(Color.blue.opacity(0.7))
-                                        .cornerRadius(10)
-                                        .foregroundColor(.white)
-                                } else {
-                                    Text(message.text)
-                                        .padding()
-                                        .background(Color.gray.opacity(0.3))
-                                        .cornerRadius(10)
-                                    Spacer()
+            NavigationStack {
+                ZStack {
+                    // 背景のグラデーション
+                    LinearGradient(gradient: Gradient(colors: [Color.blue.opacity(0.5), Color.blue.opacity(0.3)]), startPoint: .topLeading, endPoint: .bottomTrailing)
+                                    .edgesIgnoringSafeArea(.all)
+                    
+                    VStack {
+                        ScrollView {
+                            VStack(alignment: .leading, spacing: 10) {
+                                ForEach(messages) { message in
+                                    HStack {
+                                        if message.isUser {
+                                            Spacer()
+                                            Text(message.text)
+                                                .padding()
+                                                .background(Color.blue.opacity(0.8))
+                                                .cornerRadius(12)
+                                                .foregroundColor(.white)
+                                                .shadow(radius: 3)
+                                        } else {
+                                            Text(message.text)
+                                                .padding()
+                                                .background(Color.white.opacity(0.2))
+                                                .cornerRadius(12)
+                                                .foregroundColor(.white)
+                                                .shadow(radius: 3)
+                                            Spacer()
+                                        }
+                                    }
                                 }
                             }
                         }
-                    }
-                }
-                .padding()
+                        .padding()
 
-                HStack {
-                    TextField("メッセージを入力", text: $inputText)
-                        .textFieldStyle(RoundedBorderTextFieldStyle())
-                    Button("送信") {
-                        sendMessage()
-                    }
-                }
-                .padding()
+                        HStack {
+                            TextField("メッセージを入力", text: $inputText)
+                                .textFieldStyle(RoundedBorderTextFieldStyle())
+                                .padding()
+                                .background(Color.white.opacity(0.3))
+                                .cornerRadius(10)
+                                .foregroundColor(.white)
 
-                Button("リマインダー一覧を表示") {
-                    showReminderList = true
-                }
-                .padding()
-            }
-            .navigationTitle("リマインダーBot")
-            .onAppear {
-                loadReminders()
-                
-                // 0.5秒後に実行して、リマインダーの削除を遅延
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
-                    filterValidReminders()
-                }
-
-                NotificationHandler.shared.requestAuthorization() // 🔹 通知許可をリクエスト
-            }
-            // 🔹 `showSnoozeView` の変更を監視
-            .onChange(of: notificationHandler.showSnoozeView) { _, _ in
-                            if notificationHandler.showSnoozeView, let reminder = notificationHandler.snoozeReminder {
-                                print("🟢 SnoozeView を表示します")
-                                self.snoozeReminder = reminder
-                                self.showSnoozeView = true
-                                notificationHandler.showSnoozeView = false // 🔹 一度開いたらリセット
+                            Button(action: sendMessage) {
+                                Image(systemName: "paperplane.fill")
+                                    .foregroundColor(.white)
+                                    .padding()
+                                    .background(Color.blue)
+                                    .clipShape(Circle())
+                                    .shadow(radius: 3)
                             }
-            }
-            .sheet(isPresented: $showReminderList) {
-                ReminderListView(reminders: $reminders, updateReminder: updateReminder) // 🔹 `updateReminder` を渡す
-            }
-            .sheet(isPresented: $showSnoozeView) {
-                if let reminder = snoozeReminder {
-                    SnoozeView(reminder: reminder, updateReminder: updateReminder) // 🔹 `updateReminder` を渡す
+                        }
+                        .padding()
+
+                        Button(action: { showReminderList = true }) {
+                            Text("リマインダー一覧を表示")
+                                .padding()
+                                .frame(maxWidth: .infinity)
+                                .background(Color.blue)
+                                .foregroundColor(.white)
+                                .cornerRadius(10)
+                                .shadow(radius: 3)
+                        }
+                        .padding()
+                    }
+                    .navigationTitle("リマインダーBot")
+                    .onAppear {
+                        loadReminders()
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                            filterValidReminders()
+                        }
+                        NotificationHandler.shared.requestAuthorization()
+                    }
+                    .onChange(of: notificationHandler.showSnoozeView) { _, _ in
+                        if notificationHandler.showSnoozeView, let reminder = notificationHandler.snoozeReminder {
+                            self.snoozeReminder = reminder
+                            self.showSnoozeView = true
+                            notificationHandler.showSnoozeView = false
+                        }
+                    }
+                    .sheet(isPresented: $showReminderList) {
+                        ReminderListView(reminders: $reminders, updateReminder: updateReminder)
+                    }
+                    .sheet(isPresented: $showSnoozeView) {
+                        if let reminder = snoozeReminder {
+                            SnoozeView(reminder: reminder, updateReminder: updateReminder)
+                        }
+                    }
                 }
             }
         }
-    }
 
     func updateReminder(oldReminder: Reminder, newDate: Date) {
         if let index = reminders.firstIndex(where: { $0.id == oldReminder.id }) {

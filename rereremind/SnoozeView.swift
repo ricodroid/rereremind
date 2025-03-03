@@ -4,6 +4,12 @@
 //
 //  Created by riko on 2025/02/27.
 //
+//
+//  SnoozeView.swift
+//  rereremind
+//
+//  Created by riko on 2025/02/27.
+//
 import SwiftUI
 import UserNotifications
 
@@ -13,14 +19,14 @@ struct SnoozeView: View {
     var updateReminder: (Reminder, Date) -> Void // 🔹 `updateReminder` クロージャを追加
 
     let snoozeOptions: [(title: String, minutes: Int)] = [
-        ("10分後に再通知", 10),
-        ("1時間後に再通知", 60),
-        ("2時間後に再通知", 120),
-        ("3時間後に再通知", 180),
-        ("明日の同じ時間に再通知", 1440),
-        ("2日後の同じ時間に再通知", 2880),
-        ("3日後の同じ時間に再通知", 4320),
-        ("1週間後の同じ時間に再通知", 10080)
+        (NSLocalizedString("snooze_10_minutes", comment: ""), 10),
+        (NSLocalizedString("snooze_1_hour", comment: ""), 60),
+        (NSLocalizedString("snooze_2_hours", comment: ""), 120),
+        (NSLocalizedString("snooze_3_hours", comment: ""), 180),
+        (NSLocalizedString("snooze_tomorrow_same_time", comment: ""), 1440),
+        (NSLocalizedString("snooze_2_days_later", comment: ""), 2880),
+        (NSLocalizedString("snooze_3_days_later", comment: ""), 4320),
+        (NSLocalizedString("snooze_1_week_later", comment: ""), 10080)
     ]
 
     var body: some View {
@@ -38,10 +44,10 @@ struct SnoozeView: View {
                     }
                 }
             }
-            .navigationTitle("通知を延長")
+            .navigationTitle(NSLocalizedString("snooze_title", comment: ""))
             .toolbar {
                 ToolbarItem(placement: .navigationBarTrailing) {
-                    Button("閉じる") {
+                    Button(NSLocalizedString("close", comment: "")) {
                         dismiss()
                     }
                 }
@@ -51,7 +57,7 @@ struct SnoozeView: View {
 
     func scheduleSnoozedNotification(at date: Date, message: String) {
         let content = UNMutableNotificationContent()
-        content.title = "リマインダー"
+        content.title = NSLocalizedString("reminder_title", comment: "")
         content.body = message
         content.sound = .default
 
@@ -60,7 +66,7 @@ struct SnoozeView: View {
 
         UNUserNotificationCenter.current().add(request) { error in
             if let error = error {
-                print("再通知のスケジュールに失敗: \(error.localizedDescription)")
+                print(NSLocalizedString("schedule_error", comment: "") + " \(error.localizedDescription)")
             }
         }
     }
