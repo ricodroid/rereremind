@@ -166,48 +166,56 @@ struct ContentView: View {
 
 
     func sendMessage() {
-        let userMessage = Message(text: inputText, isUser: true)
-        messages.append(userMessage)
-        
-        if lastUserInput.isEmpty {
-            lastUserInput = inputText
-            let botPromptMessage = Message(
-                text: String(format: NSLocalizedString("reminder_prompt", comment: ""), inputText),
-                isUser: false
-            )
-            messages.append(botPromptMessage)
-        } else if let date = extractDateTime(from: inputText) {
-            let now = Date()
-            if date < now {
-                let botPastDateMessage = Message(
-                    text: NSLocalizedString("past_date_error", comment: ""),
-                    isUser: false
-                )
-                messages.append(botPastDateMessage)
-            } else {
-                let reminder = Reminder(text: lastUserInput, date: date)
-                reminders.append(reminder) // リストに追加
-                saveReminders() // 永続化
-                
-                let botConfirmationMessage = Message(
-                    text: String(format: NSLocalizedString("reminder_set", comment: ""), formatDate(date)),
-                    isUser: false
-                )
-                messages.append(botConfirmationMessage)
-                scheduleNotification(at: date, message: lastUserInput)
-                lastUserInput = ""
-            }
-        } else {
-            let botErrorMessage = Message(
-                text: NSLocalizedString("unknown_date_error", comment: ""),
-                isUser: false
-            )
-            messages.append(botErrorMessage)
+        guard !inputText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+            print("⚠️ 空のメッセージは送信できません")
+            return
         }
         
-        inputText = ""
+        let userMessage = Message(text: inputText, isUser: true)
+        messages.append(userMessage)
+
+        let input = inputText // ユーザーの入力を保存
+        inputText = "" // すぐにクリアして UI を更新
+
+        DispatchQueue.main.async {
+            if lastUserInput.isEmpty {
+                lastUserInput = input
+                let botPromptMessage = Message(
+                    text: String(format: NSLocalizedString("reminder_prompt", comment: ""), input),
+                    isUser: false
+                )
+                messages.append(botPromptMessage)
+            } else if let date = extractDateTime(from: input) {
+                let now = Date()
+                if date < now {
+                    let botPastDateMessage = Message(
+                        text: NSLocalizedString("past_date_error", comment: ""),
+                        isUser: false
+                    )
+                    messages.append(botPastDateMessage)
+                } else {
+                    let reminder = Reminder(text: lastUserInput, date: date)
+                    reminders.append(reminder) // リストに追加
+                    saveReminders() // 永続化
+                    
+                    let botConfirmationMessage = Message(
+                        text: String(format: NSLocalizedString("reminder_set", comment: ""), formatDate(date)),
+                        isUser: false
+                    )
+                    messages.append(botConfirmationMessage)
+                    scheduleNotification(at: date, message: lastUserInput)
+                    lastUserInput = "" // **リマインダーがセットされた場合のみクリア**
+                }
+            } else {
+                let botErrorMessage = Message(
+                    text: NSLocalizedString("unknown_date_error", comment: ""),
+                    isUser: false
+                )
+                messages.append(botErrorMessage)
+            }
+        }
     }
-    
+
     func formatDate(_ date: Date) -> String {
         let formatter = DateFormatter()
         formatter.dateFormat = "yyyy/MM/dd HH:mm"
@@ -223,13 +231,15 @@ struct ContentView: View {
 
         print("📥 入力テキスト: \(text)")
 
+        var dateFound = false
+
         // **日付の抽出**
         let datePatterns = [
             "\\d{4}/\\d{1,2}/\\d{1,2}",
             "\\d{1,2}/\\d{1,2}",
             "\\d{1,2}月\\d{1,2}日",
             "\\d{4}年\\d{1,2}月\\d{1,2}日",
-            "今日|きょう|today|Tomorrow",
+            "今日|きょう|today",
             "明日|あした|tomorrow",
             "明後日|あさって|day after tomorrow",
             "明々後日|three days later"
@@ -251,6 +261,7 @@ struct ContentView: View {
                         }
                         components.month = calendar.component(.month, from: parsedDate)
                         components.day = calendar.component(.day, from: parsedDate)
+                        dateFound = true
                         break
                     }
                 }
@@ -260,8 +271,8 @@ struct ContentView: View {
 
         // **時間の抽出**
         let timePatterns = [
-            "\\d{1,2}:\\d{2}\\s?(am|pm|a\\.m\\.|p\\.m\\.)?", // 10:30 pm
-            "\\d{1,2}\\s?(am|pm|a\\.m\\.|p\\.m\\.)", // 5pm, 10 a.m.
+            "\\b\\d{1,2}:\\d{2}\\s?(am|pm|a\\.m\\.|p\\.m\\.)\\b", // 10:30 pm
+            "\\b\\d{1,2}\\s?(am|pm|a\\.m\\.|p\\.m\\.)\\b", // 5pm, 10 a.m.
             "midnight",
             "noon",
             "in \\d+ minutes",
@@ -300,27 +311,25 @@ struct ContentView: View {
                     isAM = true
                 }
 
-                // **フォーマット修正: `"5pm"` → `"5 PM"` に変換**
-                if matchedTime.range(of: "\\d{1,2}(am|pm|a\\.m\\.|p\\.m\\.)", options: .regularExpression) != nil {
-                    matchedTime = matchedTime.replacingOccurrences(of: "am", with: " AM")
-                                             .replacingOccurrences(of: "pm", with: " PM")
-                                             .replacingOccurrences(of: "a.m.", with: " AM")
-                                             .replacingOccurrences(of: "p.m.", with: " PM")
-                                             .replacingOccurrences(of: "PM", with: " PM")
-                                             .replacingOccurrences(of: "AM", with: " AM")
-                    if !matchedTime.contains(" ") {
-                        let hourPart = String(matchedTime.prefix { $0.isNumber }) // 数字部分だけ取得
-                        let periodPart = String(matchedTime.suffix(2)) // AM/PM部分を取得
-                        matchedTime = hourPart + " " + periodPart // "5PM" → "5 PM"
-                    }
-                }
+                // **フォーマット修正**
+                matchedTime = matchedTime.replacingOccurrences(of: "p.m.", with: " PM")
+                                         .replacingOccurrences(of: "a.m.", with: " AM")
+                                         .replacingOccurrences(of: "pm", with: " PM")
+                                         .replacingOccurrences(of: "am", with: " AM")
+                                         .trimmingCharacters(in: .whitespaces)
 
                 print("🔄 変換後の時間表記: \(matchedTime)")
 
-                formatter.dateFormat = "h a"
+                // **h:mm a に対応**
+                if matchedTime.contains(":") {
+                    formatter.dateFormat = "h:mm a"
+                } else {
+                    formatter.dateFormat = "h a"
+                }
+
                 if let parsedTime = formatter.date(from: matchedTime) {
                     var hour = calendar.component(.hour, from: parsedTime)
-                    let minute = 0
+                    let minute = calendar.component(.minute, from: parsedTime)
 
                     print("🕒 解析前の時間: \(hour):\(minute) isPM: \(isPM) isAM: \(isAM)")
 
@@ -342,6 +351,14 @@ struct ContentView: View {
             }
         }
 
+        // **日付が見つからず、時間だけ指定された場合は今日の日付を使用**
+        if !dateFound && foundTime {
+            print("📅 日付が見つからなかったため、今日の日付を使用")
+            components.year = calendar.component(.year, from: now)
+            components.month = calendar.component(.month, from: now)
+            components.day = calendar.component(.day, from: now)
+        }
+
         if !foundTime {
             components.hour = 9
             components.minute = 0
@@ -361,6 +378,7 @@ struct ContentView: View {
         print("❌ 変換に失敗しました")
         return nil
     }
+
 
     func loadReminders() {
             if let savedData = UserDefaults.standard.data(forKey: remindersKey) {
