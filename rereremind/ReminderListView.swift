@@ -26,7 +26,7 @@ struct ReminderListView: View {
                                 .foregroundColor(.gray)
                         }
                         Spacer()
-                        Button("延長") {
+                        Button(NSLocalizedString("snooze_button", comment: "")) {
                             selectedReminder = reminder
                         }
                         .buttonStyle(.borderedProminent)

@@ -21,3 +21,8 @@
 "close" = "閉じる";
 "reminder_title" = "リマインダー";
 "schedule_error" = "再通知のスケジュールに失敗:";
+"show_reminder_list" = "リマインダー一覧を表示";
+"reminder_bot_title" = "Rereremind";
+"snooze_button" = "延長";
+"message_placeholder" = "メッセージを入力";
+

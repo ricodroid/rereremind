@@ -21,3 +21,8 @@
 "close" = "Close";
 "reminder_title" = "Reminder";
 "schedule_error" = "Failed to schedule snooze notification:";
+"show_reminder_list" = "Show Reminder List";
+"reminder_bot_title" = "Rereremind";
+"snooze_button" = "Snooze";
+"message_placeholder" = "Enter your message";
+
