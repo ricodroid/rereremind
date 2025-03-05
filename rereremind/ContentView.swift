@@ -176,8 +176,9 @@ struct ContentView: View {
 
         let input = inputText // ユーザーの入力を保存
         inputText = "" // すぐにクリアして UI を更新
+        print("テキストをからにする!!")
 
-        DispatchQueue.main.async {
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) {
             if lastUserInput.isEmpty {
                 lastUserInput = input
                 let botPromptMessage = Message(
@@ -271,6 +272,7 @@ struct ContentView: View {
 
         // **時間の抽出**
         let timePatterns = [
+            "\\b\\d{1,2}:\\d{2}\\b",
             "\\b\\d{1,2}:\\d{2}\\s?(am|pm|a\\.m\\.|p\\.m\\.)\\b", // 10:30 pm
             "\\b\\d{1,2}\\s?(am|pm|a\\.m\\.|p\\.m\\.)\\b", // 5pm, 10 a.m.
             "midnight",
@@ -321,10 +323,15 @@ struct ContentView: View {
                 print("🔄 変換後の時間表記: \(matchedTime)")
 
                 // **h:mm a に対応**
+                // **h:mm a（12時間表記）または HH:mm（24時間表記）に対応**
                 if matchedTime.contains(":") {
-                    formatter.dateFormat = "h:mm a"
+                    if matchedTime.range(of: "\\d{1,2}:\\d{2}\\s?(AM|PM|a\\.m\\.|p\\.m\\.)", options: .regularExpression) != nil {
+                        formatter.dateFormat = "h:mm a" // 12時間表記
+                    } else {
+                        formatter.dateFormat = "HH:mm" // 24時間表記
+                    }
                 } else {
-                    formatter.dateFormat = "h a"
+                    formatter.dateFormat = "h a" // 5 PM
                 }
 
                 if let parsedTime = formatter.date(from: matchedTime) {
@@ -357,6 +364,13 @@ struct ContentView: View {
             components.year = calendar.component(.year, from: now)
             components.month = calendar.component(.month, from: now)
             components.day = calendar.component(.day, from: now)
+
+            // ✅ 現在時刻より前の時間が指定された場合、翌日に設定
+            let extractedTime = calendar.date(from: components) ?? now
+            if extractedTime < now {
+                print("🌙 指定された時間が過去のため、翌日に設定")
+                components.day! += 1
+            }
         }
 
         if !foundTime {
