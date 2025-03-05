@@ -24,9 +24,16 @@ struct ContentView: View {
             NavigationStack {
                 ZStack {
                     // 背景のグラデーション
-                    LinearGradient(gradient: Gradient(colors: [Color.blue.opacity(0.5), Color.blue.opacity(0.3)]), startPoint: .topLeading, endPoint: .bottomTrailing)
-                                    .edgesIgnoringSafeArea(.all)
-                    
+                    LinearGradient(
+                        gradient: Gradient(colors: [
+                            Color.blue.opacity(0.2),
+                            Color.blue.opacity(0.1)
+                        ]),
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    )
+                    .edgesIgnoringSafeArea(.all)
+
                     VStack {
                         ScrollView {
                             VStack(alignment: .leading, spacing: 10) {
@@ -57,11 +64,12 @@ struct ContentView: View {
 
                         HStack {
                             TextField("メッセージを入力", text: $inputText)
-                                .textFieldStyle(RoundedBorderTextFieldStyle())
+                                .textFieldStyle(PlainTextFieldStyle())
                                 .padding()
-                                .background(Color.white.opacity(0.3))
+                                .frame(height: 50)
+                                .background(Color.white)
                                 .cornerRadius(10)
-                                .foregroundColor(.white)
+                                .foregroundColor(.black)
 
                             Button(action: sendMessage) {
                                 Image(systemName: "paperplane.fill")
@@ -72,6 +80,7 @@ struct ContentView: View {
                                     .shadow(radius: 3)
                             }
                         }
+
                         .padding()
 
                         Button(action: { showReminderList = true }) {
