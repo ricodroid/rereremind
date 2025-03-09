@@ -70,6 +70,9 @@ struct ContentView: View {
                                 .background(Color.white)
                                 .cornerRadius(10)
                                 .foregroundColor(.black)
+                                .onSubmit {
+                                    sendMessage()
+                                }
 
                             Button(action: sendMessage) {
                                 Image(systemName: "paperplane.fill")
@@ -170,13 +173,12 @@ struct ContentView: View {
             print("⚠️ 空のメッセージは送信できません")
             return
         }
-        
+
         let userMessage = Message(text: inputText, isUser: true)
         messages.append(userMessage)
 
         let input = inputText // ユーザーの入力を保存
-        inputText = "" // すぐにクリアして UI を更新
-        print("テキストをからにする!!")
+        inputText = "" // 🔹 ここで即クリアする
 
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) {
             if lastUserInput.isEmpty {
@@ -194,6 +196,7 @@ struct ContentView: View {
                         isUser: false
                     )
                     messages.append(botPastDateMessage)
+                    lastUserInput = ""
                 } else {
                     let reminder = Reminder(text: lastUserInput, date: date)
                     reminders.append(reminder) // リストに追加

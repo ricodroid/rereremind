@@ -34,7 +34,7 @@ struct ReminderListView: View {
                 }
                 .onDelete(perform: deleteReminder)
             }
-            .navigationTitle("リマインダー一覧")
+            .navigationTitle("Reminder")
             .sheet(item: $selectedReminder) { reminder in
                 SnoozeView(reminder: reminder, updateReminder: updateReminder) // 🔹 `updateReminder` を渡す
             }
