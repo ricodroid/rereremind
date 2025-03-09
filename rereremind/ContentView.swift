@@ -84,6 +84,8 @@ struct ContentView: View {
                             }
                         }
                         .padding()
+                    }.onTapGesture {
+                        hideKeyboard() // 🔹 画面タップ時にキーボードを閉じる
                     }
                     .navigationTitle(NSLocalizedString("reminder_bot_title", comment: ""))
                     .toolbar {
@@ -189,219 +191,246 @@ struct ContentView: View {
         inputText = "" // 🔹 ここで即クリアする
 
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) {
-            if lastUserInput.isEmpty {
+            let now = Date()
+
+            // 🔹 `lastUserInput` にリマインド内容がある場合 → 日付または時間を期待
+            if !lastUserInput.isEmpty {
+                if let date = extractDateTime(from: input) {
+                    if date < now {
+                        let botPastDateMessage = Message(
+                            text: NSLocalizedString("past_date_error", comment: ""),
+                            isUser: false
+                        )
+                        messages.append(botPastDateMessage)
+                        print("⚠️ 過去の日時が入力されたため、再入力を促す")
+                    } else {
+                        let reminder = Reminder(text: lastUserInput, date: date)
+                        reminders.append(reminder) // リストに追加
+                        saveReminders() // 永続化
+                        
+                        let botConfirmationMessage = Message(
+                            text: String(format: NSLocalizedString("reminder_set", comment: ""), formatDate(date)),
+                            isUser: false
+                        )
+                        messages.append(botConfirmationMessage)
+                        scheduleNotification(at: date, message: lastUserInput)
+
+                        lastUserInput = "" // **リマインダーがセットされた場合のみクリア**
+                    }
+                } else {
+                    let botErrorMessage = Message(
+                        text: NSLocalizedString("unknown_date_error", comment: ""),
+                        isUser: false
+                    )
+                    messages.append(botErrorMessage)
+                    print("⚠️ 有効な日付・時間が入力されなかったため、再入力を促す")
+                }
+            }
+            // 🔹 `lastUserInput` が空 → ユーザーがリマインド内容を入力
+            else {
                 lastUserInput = input
                 let botPromptMessage = Message(
-                    text: String(format: NSLocalizedString("reminder_prompt", comment: ""), input),
+                    text: String(format: NSLocalizedString("reminder_prompt", comment: "%@ Got it! When should I remind you?"), input),
                     isUser: false
                 )
                 messages.append(botPromptMessage)
-            } else if let date = extractDateTime(from: input) {
-                let now = Date()
-                if date < now {
-                    let botPastDateMessage = Message(
-                        text: NSLocalizedString("past_date_error", comment: ""),
-                        isUser: false
-                    )
-                    messages.append(botPastDateMessage)
-                    lastUserInput = ""
-                } else {
-                    let reminder = Reminder(text: lastUserInput, date: date)
-                    reminders.append(reminder) // リストに追加
-                    saveReminders() // 永続化
-                    
-                    let botConfirmationMessage = Message(
-                        text: String(format: NSLocalizedString("reminder_set", comment: ""), formatDate(date)),
-                        isUser: false
-                    )
-                    messages.append(botConfirmationMessage)
-                    scheduleNotification(at: date, message: lastUserInput)
-                    lastUserInput = "" // **リマインダーがセットされた場合のみクリア**
-                }
-            } else {
-                let botErrorMessage = Message(
-                    text: NSLocalizedString("unknown_date_error", comment: ""),
-                    isUser: false
-                )
-                messages.append(botErrorMessage)
             }
         }
     }
+
 
     func formatDate(_ date: Date) -> String {
         let formatter = DateFormatter()
         formatter.dateFormat = "yyyy/MM/dd HH:mm"
         return formatter.string(from: date)
     }
-    
+
     func extractDateTime(from text: String) -> Date? {
-        let formatter = DateFormatter()
-        formatter.locale = Locale(identifier: "en_US_POSIX")
         let now = Date()
         let calendar = Calendar.current
         var components = calendar.dateComponents([.year, .month, .day, .hour, .minute], from: now)
 
-        print("📥 入力テキスト: \(text)")
-
         var dateFound = false
-
-        // **日付の抽出**
-        let datePatterns = [
-            "\\d{4}/\\d{1,2}/\\d{1,2}",
-            "\\d{1,2}/\\d{1,2}",
-            "\\d{1,2}月\\d{1,2}日",
-            "\\d{4}年\\d{1,2}月\\d{1,2}日",
-            "今日|きょう|today",
-            "明日|あした|tomorrow",
-            "明後日|あさって|day after tomorrow",
-            "明々後日|three days later"
-        ]
-
-        for pattern in datePatterns {
-            if let match = text.range(of: pattern, options: .regularExpression) {
-                let matchedDate = String(text[match])
-                print("📅 マッチした日付: \(matchedDate)")
-
-                let dateFormats = ["yyyy/M/d", "yyyy年M月d日", "M/d"]
-                for format in dateFormats {
-                    formatter.dateFormat = format
-                    if let parsedDate = formatter.date(from: matchedDate) {
-                        if format == "M/d" {
-                            components.year = calendar.component(.year, from: now)
-                        } else {
-                            components.year = calendar.component(.year, from: parsedDate)
-                        }
-                        components.month = calendar.component(.month, from: parsedDate)
-                        components.day = calendar.component(.day, from: parsedDate)
-                        dateFound = true
-                        break
-                    }
-                }
-                break
-            }
+        if let extractedDate = extractDate(from: text, now: now) {
+            components.year = calendar.component(.year, from: extractedDate)
+            components.month = calendar.component(.month, from: extractedDate)
+            components.day = calendar.component(.day, from: extractedDate)
+            dateFound = true
         }
-
-        // **時間の抽出**
-        let timePatterns = [
-            "\\b\\d{1,2}:\\d{2}\\b",
-            "\\b\\d{1,2}:\\d{2}\\s?(am|pm|a\\.m\\.|p\\.m\\.)\\b", // 10:30 pm
-            "\\b\\d{1,2}\\s?(am|pm|a\\.m\\.|p\\.m\\.)\\b", // 5pm, 10 a.m.
-            "midnight",
-            "noon",
-            "in \\d+ minutes",
-            "in \\d+ hours",
-            "\\d{1,2}時間後",
-            "\\d{1,2}分後"
-        ]
 
         var foundTime = false
-        var isPM = false
-        var isAM = false
-
-        for pattern in timePatterns {
-            if let match = text.range(of: pattern, options: .regularExpression) {
-                var matchedTime = String(text[match])
-                matchedTime = matchedTime.replacingOccurrences(of: "：", with: ":") // 全角対応
-
-                print("⏰ マッチした時間: \(matchedTime)")
-
-                if matchedTime == "midnight" {
-                    components.hour = 0
-                    components.minute = 0
-                    foundTime = true
-                    break
-                } else if matchedTime == "noon" {
-                    components.hour = 12
-                    components.minute = 0
-                    foundTime = true
-                    break
-                }
-
-                // **AM/PM表記の変換**
-                if matchedTime.contains("p.m.") || matchedTime.contains("pm") || matchedTime.contains("PM") {
-                    isPM = true
-                } else if matchedTime.contains("a.m.") || matchedTime.contains("am") || matchedTime.contains("AM") {
-                    isAM = true
-                }
-
-                // **フォーマット修正**
-                matchedTime = matchedTime.replacingOccurrences(of: "p.m.", with: " PM")
-                                         .replacingOccurrences(of: "a.m.", with: " AM")
-                                         .replacingOccurrences(of: "pm", with: " PM")
-                                         .replacingOccurrences(of: "am", with: " AM")
-                                         .trimmingCharacters(in: .whitespaces)
-
-                print("🔄 変換後の時間表記: \(matchedTime)")
-
-                // **h:mm a に対応**
-                // **h:mm a（12時間表記）または HH:mm（24時間表記）に対応**
-                if matchedTime.contains(":") {
-                    if matchedTime.range(of: "\\d{1,2}:\\d{2}\\s?(AM|PM|a\\.m\\.|p\\.m\\.)", options: .regularExpression) != nil {
-                        formatter.dateFormat = "h:mm a" // 12時間表記
-                    } else {
-                        formatter.dateFormat = "HH:mm" // 24時間表記
-                    }
-                } else {
-                    formatter.dateFormat = "h a" // 5 PM
-                }
-
-                if let parsedTime = formatter.date(from: matchedTime) {
-                    var hour = calendar.component(.hour, from: parsedTime)
-                    let minute = calendar.component(.minute, from: parsedTime)
-
-                    print("🕒 解析前の時間: \(hour):\(minute) isPM: \(isPM) isAM: \(isAM)")
-
-                    if isPM && hour < 12 {
-                        hour += 12
-                    } else if isAM && hour == 12 {
-                        hour = 0
-                    }
-
-                    components.hour = hour
-                    components.minute = minute
-                    foundTime = true
-
-                    print("✅ 変換後の時間: \(components.hour!):\(components.minute!)")
-                    break
-                } else {
-                    print("⚠️ 時間の解析に失敗しました: \(matchedTime)")
-                }
-            }
+        if let extractedTime = extractTime(from: text) {
+            components.hour = extractedTime.hour
+            components.minute = extractedTime.minute
+            foundTime = true
         }
 
-        // **日付が見つからず、時間だけ指定された場合は今日の日付を使用**
-        if !dateFound && foundTime {
-            print("📅 日付が見つからなかったため、今日の日付を使用")
-            components.year = calendar.component(.year, from: now)
-            components.month = calendar.component(.month, from: now)
-            components.day = calendar.component(.day, from: now)
-
-            // ✅ 現在時刻より前の時間が指定された場合、翌日に設定
+        // 🔹 日付のみ指定された場合 → その日の 9:00 AM に設定
+        if dateFound && !foundTime {
+            components.hour = 9
+            components.minute = 0
+        }
+        // 🔹 時間のみ指定された場合 → 今の時間と比較し、一番近いその時間に設定
+        else if !dateFound && foundTime {
             let extractedTime = calendar.date(from: components) ?? now
             if extractedTime < now {
-                print("🌙 指定された時間が過去のため、翌日に設定")
+                // 今の時間を過ぎていたら翌日に設定
                 components.day! += 1
             }
         }
 
-        if !foundTime {
-            components.hour = 9
-            components.minute = 0
-            print("⏳ 時間が見つからなかったため、デフォルト 9:00 を設定")
+        return calendar.date(from: components)
+    }
+
+
+    func extractDate(from text: String, now: Date) -> Date? {
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        
+        let calendar = Calendar.current
+        var extractedDate: Date?
+        
+        // 🔹 入力テキストを正規化（小文字化 + 半角変換）
+        let normalizedText = text.lowercased()
+            .replacingOccurrences(of: "　", with: " ") // 全角スペースを半角スペースに変換
+            .replacingOccurrences(of: "／", with: "/") // 全角スラッシュを半角スラッシュに変換
+            .replacingOccurrences(of: "．", with: ".") // 全角ピリオドを半角ピリオドに変換
+            .replacingOccurrences(of: "：", with: ":") // 全角コロンを半角コロンに変換
+            .replacingOccurrences(of: "年", with: "/") // "2024年5月1日" → "2024/5/1"
+            .replacingOccurrences(of: "月", with: "/") // "5月1日" → "5/1"
+            .replacingOccurrences(of: "(?<=\\d)日", with: "", options: .regularExpression) // "5/1日" → "5/1"
+        
+        // 🔹 自然言語の日付パターン
+        let datePatterns: [String: Int] = [
+            "今日|きょう|today": 0,  // 今日
+            "明日|あした|tomorrow": 1,  // 明日
+            "明後日|あさって|day after tomorrow": 2,  // 明後日
+            "昨日|きのう|yesterday": -1,  // 昨日（無視）
+            "一昨日|おととい|two days ago": -2 // 一昨日（無視）
+        ]
+        print("🔍 正規化後のテキスト: \(normalizedText)")
+        if normalizedText.contains("明日") {
+            print("✅ 明日を検出！（contains() でマッチ）")
+        }
+        
+        for (pattern, offset) in datePatterns {
+            print("🔍 チェック: \(pattern) に \(normalizedText) がマッチするか？")
+
+            if let matchRange = normalizedText.range(of: pattern, options: .regularExpression) {
+                let matchedText = String(normalizedText[matchRange])
+                print("📅 マッチした日付ワード: \(matchedText) (offset: \(offset))")
+
+                extractedDate = calendar.date(byAdding: .day, value: offset, to: now)
+                if offset >= 0 { // 過去の日付は無視
+                    print("📅 解析した日付: \(extractedDate!)")
+                    return extractedDate
+                }
+            }
         }
 
-        var localCalendar = Calendar.current
-        localCalendar.timeZone = TimeZone.current
-        var extractedDate = localCalendar.date(from: components)
+        // 🔹 数字での日付指定パターン（yyyy/MM/dd, MM/dd）
+        let dateRegexPatterns = [
+            "\\d{4}/\\d{1,2}/\\d{1,2}", // 2025/05/01
+            "\\d{1,2}/\\d{1,2}",        // 5/1
+        ]
+        
+        for pattern in dateRegexPatterns {
+            if let match = normalizedText.range(of: pattern, options: .regularExpression) {
+                let matchedDate = String(normalizedText[match])
+                print("📅 マッチした日付: \(matchedDate)")
 
-        if let date = extractedDate {
-            let timezoneDate = localCalendar.date(bySettingHour: components.hour!, minute: components.minute!, second: 0, of: date)
-            print("📅 最終変換された日時: \(formatter.string(from: timezoneDate!))")
-            return timezoneDate
+                let dateFormats = ["yyyy/M/d", "M/d"]
+                for format in dateFormats {
+                    formatter.dateFormat = format
+                    if let parsedDate = formatter.date(from: matchedDate) {
+                        // 年が指定されていない（例: "5/1"）場合は今年と判断
+                        if format == "M/d" {
+                            let currentYear = calendar.component(.year, from: now)
+                            var dateComponents = calendar.dateComponents([.month, .day], from: parsedDate)
+                            dateComponents.year = currentYear
+                            extractedDate = calendar.date(from: dateComponents)
+                        } else {
+                            extractedDate = parsedDate
+                        }
+                        print("📅 解析後の確定日付: \(extractedDate!)")
+                        return extractedDate
+                    }
+                }
+            }
         }
 
-        print("❌ 変換に失敗しました")
         return nil
+    }
+
+
+    func extractTime(from text: String) -> (hour: Int, minute: Int)? {
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        
+        let timePatterns = [
+            "\\b\\d{1,2}:\\d{2}\\b",
+            "\\b\\d{1,2}:\\d{2}\\s?(am|pm|a\\.m\\.|p\\.m\\.)\\b",
+            "\\b\\d{1,2}\\s?(am|pm|a\\.m\\.|p\\.m\\.)\\b",
+            "midnight",
+            "noon"
+        ]
+        
+        var isPM = false
+        var isAM = false
+        
+        for pattern in timePatterns {
+            if let match = text.range(of: pattern, options: .regularExpression) {
+                var matchedTime = String(text[match]).trimmingCharacters(in: .whitespaces)
+                print("⏰ マッチした時間: \(matchedTime)")
+                
+                switch matchedTime {
+                case "midnight":
+                    return (0, 0)
+                case "noon":
+                    return (12, 0)
+                default:
+                    if matchedTime.contains("p.m.") || matchedTime.contains("pm") {
+                        isPM = true
+                    } else if matchedTime.contains("a.m.") || matchedTime.contains("am") {
+                        isAM = true
+                    }
+                    
+                    matchedTime = matchedTime.replacingOccurrences(of: "p.m.", with: " PM")
+                                             .replacingOccurrences(of: "a.m.", with: " AM")
+                                             .replacingOccurrences(of: "pm", with: " PM")
+                                             .replacingOccurrences(of: "am", with: " AM")
+                                             .trimmingCharacters(in: .whitespaces)
+                    
+                    print("🔄 変換後の時間表記: \(matchedTime)")
+                    
+                    formatter.dateFormat = matchedTime.contains(":") ? (matchedTime.contains("AM") || matchedTime.contains("PM") ? "h:mm a" : "HH:mm") : "h a"
+                    
+                    if let parsedTime = formatter.date(from: matchedTime) {
+                        let calendar = Calendar.current
+                        var hour = calendar.component(.hour, from: parsedTime)
+                        let minute = calendar.component(.minute, from: parsedTime)
+                        
+                        print("🕒 解析前の時間: \(hour):\(minute) isPM: \(isPM) isAM: \(isAM)")
+                        hour = convertTo24HourFormat(hour: hour, isPM: isPM, isAM: isAM)
+                        
+                        print("✅ 変換後の時間: \(hour):\(minute)")
+                        return (hour, minute)
+                    } else {
+                        print("⚠️ 時間の解析に失敗しました: \(matchedTime)")
+                    }
+                }
+            }
+        }
+        return nil
+    }
+
+    func convertTo24HourFormat(hour: Int, isPM: Bool, isAM: Bool) -> Int {
+        if isPM && hour < 12 {
+            return hour + 12
+        } else if isAM && hour == 12 {
+            return 0
+        }
+        return hour
     }
 
 
@@ -454,7 +483,10 @@ struct ContentView: View {
         }
     }
 
-
+    // 🔹 キーボードを閉じる処理
+    func hideKeyboard() {
+        UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil)
+    }
 }
 
 #Preview {
