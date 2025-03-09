@@ -83,21 +83,27 @@ struct ContentView: View {
                                     .shadow(radius: 3)
                             }
                         }
-
-                        .padding()
-
-                        Button(action: { showReminderList = true }) {
-                            Text(NSLocalizedString("show_reminder_list", comment: ""))
-                                .padding()
-                                .frame(maxWidth: .infinity)
-                                .background(Color.blue)
-                                .foregroundColor(.white)
-                                .cornerRadius(10)
-                                .shadow(radius: 3)
-                        }
                         .padding()
                     }
                     .navigationTitle(NSLocalizedString("reminder_bot_title", comment: ""))
+                    .toolbar {
+                        ToolbarItem(placement: .navigationBarTrailing) {
+                            Menu {
+                                Button(action: { showReminderList = true }) {
+                                    Label(NSLocalizedString("show_reminder_list", comment: ""), systemImage: "list.bullet")
+                                }
+                                Divider()
+                            } label: {
+                                Image(systemName: "line.horizontal.3")
+                                    .imageScale(.large)
+                                    .foregroundColor(.primary)
+                                    .padding(10)
+                                    .background(Circle().fill(Color.blue.opacity(0.2)))
+                                    .shadow(radius: 3)
+                                    .animation(.easeInOut, value: showReminderList)
+                            }
+                        }
+                    }
                     .onAppear {
                         loadReminders()
                         DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
