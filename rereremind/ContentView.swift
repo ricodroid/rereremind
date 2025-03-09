@@ -183,12 +183,12 @@ struct ContentView: View {
             print("⚠️ 空のメッセージは送信できません")
             return
         }
+        
+        let input = inputText.trimmingCharacters(in: .whitespacesAndNewlines)
+            DispatchQueue.main.async { self.inputText = "" }
 
         let userMessage = Message(text: inputText, isUser: true)
         messages.append(userMessage)
-
-        let input = inputText // ユーザーの入力を保存
-        inputText = "" // 🔹 ここで即クリアする
 
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) {
             let now = Date()
@@ -201,6 +201,8 @@ struct ContentView: View {
                             text: NSLocalizedString("past_date_error", comment: ""),
                             isUser: false
                         )
+                        inputText = ""
+                        lastUserInput = ""
                         messages.append(botPastDateMessage)
                         print("⚠️ 過去の日時が入力されたため、再入力を促す")
                     } else {
@@ -214,7 +216,7 @@ struct ContentView: View {
                         )
                         messages.append(botConfirmationMessage)
                         scheduleNotification(at: date, message: lastUserInput)
-
+                        inputText = ""
                         lastUserInput = "" // **リマインダーがセットされた場合のみクリア**
                     }
                 } else {
@@ -223,6 +225,8 @@ struct ContentView: View {
                         isUser: false
                     )
                     messages.append(botErrorMessage)
+                    inputText = ""
+                    lastUserInput = "" 
                     print("⚠️ 有効な日付・時間が入力されなかったため、再入力を促す")
                 }
             }
