@@ -105,9 +105,11 @@ struct ContentView: View {
                         }
                     }
                     .onAppear {
-                        loadReminders()
-                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
-                            filterValidReminders()
+                        DispatchQueue.global(qos: .userInitiated).async {
+                            self.loadReminders()
+                            DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                                self.filterValidReminders()
+                            }
                         }
                         NotificationHandler.shared.requestAuthorization()
                     }
@@ -404,30 +406,32 @@ struct ContentView: View {
 
 
     func loadReminders() {
+        DispatchQueue.global(qos: .userInitiated).async {
             if let savedData = UserDefaults.standard.data(forKey: remindersKey) {
                 let decoder = JSONDecoder()
                 if let loadedReminders = try? decoder.decode([Reminder].self, from: savedData) {
-                    reminders = loadedReminders
+                    DispatchQueue.main.async {
+                        self.reminders = loadedReminders
+                    }
                 }
-            }
-        }
-    
-    func filterValidReminders() {
-        UNUserNotificationCenter.current().getPendingNotificationRequests { requests in
-            DispatchQueue.main.async {
-                let requestBodies = requests.map { $0.content.body }
-                
-                // 🔹 "削除" ではなく、有効な通知をリストに残す
-                self.reminders = self.reminders.filter { reminder in
-                    requestBodies.contains(reminder.text)
-                }
-
-                self.saveReminders() // 更新後に再保存
             }
         }
     }
-
-
+    
+    func filterValidReminders() {
+        DispatchQueue.global(qos: .background).async {
+            UNUserNotificationCenter.current().getPendingNotificationRequests { requests in
+                let requestBodies = requests.map { $0.content.body }
+                
+                DispatchQueue.main.async {
+                    self.reminders = self.reminders.filter { reminder in
+                        requestBodies.contains(reminder.text)
+                    }
+                    self.saveReminders()
+                }
+            }
+        }
+    }
     
     func scheduleNotification(at date: Date, message: String) {
         let content = UNMutableNotificationContent()
