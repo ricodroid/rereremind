@@ -42,17 +42,17 @@ struct ContentView: View {
                                         if message.isUser {
                                             Spacer()
                                             Text(message.text)
-                                                .padding()
-                                                .background(Color.blue.opacity(0.8))
+                                                .padding() // ユーザー側の吹き出し
+                                                .background(Color.blue.opacity(0.9))
                                                 .cornerRadius(12)
                                                 .foregroundColor(.white)
                                                 .shadow(radius: 3)
                                         } else {
                                             Text(message.text)
                                                 .padding()
-                                                .background(Color.white.opacity(0.2))
+                                                .background(Color.white.opacity(0.9))
                                                 .cornerRadius(12)
-                                                .foregroundColor(.white)
+                                                .foregroundColor(.black)
                                                 .shadow(radius: 3)
                                             Spacer()
                                         }
